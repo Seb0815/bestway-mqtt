@@ -5,21 +5,21 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import random
 import secrets
-import string
 from dataclasses import dataclass
 from time import time
 from typing import Any
+from urllib.parse import urlparse
 
 from aiohttp import ClientSession
 
+import config as _cfg
 from .encryption import encrypt_command
 
 _LOGGER = logging.getLogger(__name__)
 
-_APP_ID = "AhFLL54HnChhrxcl9ZUJL6QNfolTIB"
-_APP_SECRET = "4ECvVs13enL5AiYSmscNjvlaisklQDz7vWPCCWXcEFjhWfTmLT"
+_APP_ID = _cfg.BESTWAY_APP_ID
+_APP_SECRET = _cfg.BESTWAY_APP_SECRET
 _TIMEOUT = 10
 
 
@@ -62,10 +62,10 @@ class SpaState:
 
 
 def _nonce() -> str:
-    return "".join(random.choices(string.ascii_lowercase + string.digits, k=32))
+    return secrets.token_hex(16)
 
 
-def _make_headers(token: str) -> dict[str, str]:
+def _make_headers(token: str, api_base: str) -> dict[str, str]:
     nonce = _nonce()
     ts = str(int(time()))
     sign = hashlib.md5(f"{_APP_ID}{_APP_SECRET}{nonce}{ts}".encode()).hexdigest().upper()
@@ -77,7 +77,7 @@ def _make_headers(token: str) -> dict[str, str]:
         "accept-language": "en",
         "sign": sign,
         "Authorization": f"token {token}",
-        "Host": "smarthub-eu.bestwaycorp.com",
+        "Host": urlparse(api_base).hostname,
         "Connection": "Keep-Alive",
         "User-Agent": "okhttp/4.9.0",
         "Content-Type": "application/json; charset=UTF-8",
@@ -96,9 +96,9 @@ class BestwayApi:
     # ── Internal HTTP helpers ─────────────────────────────────────────────────
 
     async def _get(self, path: str) -> dict[str, Any]:
-        headers = _make_headers(self._token)
+        headers = _make_headers(self._token, self._api_base)
         async with self._session.get(
-            f"{self._api_base}{path}", headers=headers, ssl=False, timeout=_TIMEOUT
+            f"{self._api_base}{path}", headers=headers, timeout=_TIMEOUT
         ) as resp:
             if resp.status in (400, 401):
                 raise PermissionError("Token expired or invalid")
@@ -106,12 +106,11 @@ class BestwayApi:
             return dict(await resp.json())
 
     async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        headers = _make_headers(self._token)
+        headers = _make_headers(self._token, self._api_base)
         async with self._session.post(
             f"{self._api_base}{path}",
             headers=headers,
             json=payload,
-            ssl=False,
             timeout=_TIMEOUT,
         ) as resp:
             if resp.status in (400, 401):
@@ -186,7 +185,7 @@ class BestwayApi:
     async def _send_command(
         self, device_id: str, product_id: str, updates: dict[str, Any]
     ) -> None:
-        headers = _make_headers(self._token)
+        headers = _make_headers(self._token, self._api_base)
         sign = headers["sign"]
 
         shadow_payload = {"state": {"desired": updates}}
@@ -228,7 +227,6 @@ class BestwayApi:
             f"{self._api_base}{path}",
             headers=headers,
             json=payload,
-            ssl=False,
             timeout=_TIMEOUT,
         ) as resp:
             return dict(await resp.json())

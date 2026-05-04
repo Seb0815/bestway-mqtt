@@ -8,18 +8,18 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import random
 import secrets
-import string
 from time import time
+from urllib.parse import urlparse
 
 from aiohttp import ClientSession
 
+import config as _cfg
+
 _LOGGER = logging.getLogger(__name__)
 
-# Application credentials from decompiled APK — identical for all users.
-_APP_ID = "AhFLL54HnChhrxcl9ZUJL6QNfolTIB"
-_APP_SECRET = "4ECvVs13enL5AiYSmscNjvlaisklQDz7vWPCCWXcEFjhWfTmLT"
+_APP_ID = _cfg.BESTWAY_APP_ID
+_APP_SECRET = _cfg.BESTWAY_APP_SECRET
 
 _TIMEOUT = 10
 
@@ -34,7 +34,7 @@ def generate_visitor_id() -> str:
 
 
 def _nonce() -> str:
-    return "".join(random.choices(string.ascii_lowercase + string.digits, k=32))
+    return secrets.token_hex(16)
 
 
 def _sign(nonce: str, timestamp: str) -> str:
@@ -42,7 +42,7 @@ def _sign(nonce: str, timestamp: str) -> str:
     return hashlib.md5(raw.encode()).hexdigest().upper()
 
 
-def _base_headers(nonce: str, timestamp: str, sign: str, token: str | None = None) -> dict[str, str]:
+def _base_headers(nonce: str, timestamp: str, sign: str, api_base: str, token: str | None = None) -> dict[str, str]:
     auth = f"token {token}" if token else "token"
     return {
         "pushtype": "fcm",
@@ -52,7 +52,7 @@ def _base_headers(nonce: str, timestamp: str, sign: str, token: str | None = Non
         "accept-language": "en",
         "sign": sign,
         "Authorization": auth,
-        "Host": "smarthub-eu.bestwaycorp.com",
+        "Host": urlparse(api_base).hostname,
         "Connection": "Keep-Alive",
         "User-Agent": "okhttp/4.9.0",
         "Content-Type": "application/json; charset=UTF-8",
@@ -84,13 +84,12 @@ async def authenticate(session: ClientSession, visitor_id: str, api_base: str) -
         "visitor_id": visitor_id,
     }
 
-    headers = _base_headers(nonce, ts, sign)
+    headers = _base_headers(nonce, ts, sign, api_base)
 
     async with session.post(
         f"{api_base}/api/enduser/visitor",
         headers=headers,
         json=payload,
-        ssl=False,
         timeout=_TIMEOUT,
     ) as resp:
         data = await resp.json()
@@ -135,14 +134,13 @@ async def bind_qr_code(
         "push_type": "android",
     }
 
-    headers = _base_headers(nonce, ts, sign, token=token)
+    headers = _base_headers(nonce, ts, sign, api_base, token=token)
     headers["pushtype"] = "android"
 
     async with session.post(
         f"{api_base}/api/enduser/grant_device",
         headers=headers,
         json=payload,
-        ssl=False,
         timeout=_TIMEOUT,
     ) as resp:
         if resp.status in (400, 401):

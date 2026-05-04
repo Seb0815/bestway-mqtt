@@ -34,6 +34,11 @@ API_ENDPOINTS: dict[str, str] = {
 
 BESTWAY_API_BASE: str = API_ENDPOINTS.get(BESTWAY_REGION, API_ENDPOINTS["EU"])
 
+# ── Bestway App Constants (from decompiled APK — identical for all users) ─────
+
+BESTWAY_APP_ID: str = "AhFLL54HnChhrxcl9ZUJL6QNfolTIB"
+BESTWAY_APP_SECRET: str = "4ECvVs13enL5AiYSmscNjvlaisklQDz7vWPCCWXcEFjhWfTmLT"
+
 # ── Credentials ───────────────────────────────────────────────────────────────
 
 
@@ -59,7 +64,11 @@ def load_credentials() -> Credentials | None:
 
 
 def save_credentials(creds: Credentials) -> None:
-    """Persist credentials to disk."""
+    """Persist credentials to disk with restrictive permissions (0600)."""
     CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CREDENTIALS_PATH.write_text(json.dumps(asdict(creds), indent=2))
+    fd = os.open(CREDENTIALS_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, json.dumps(asdict(creds), indent=2).encode())
+    finally:
+        os.close(fd)
     _LOGGER.info("Credentials saved to %s", CREDENTIALS_PATH)

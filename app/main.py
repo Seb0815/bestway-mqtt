@@ -162,9 +162,15 @@ async def run() -> None:
                         await api.set_filter(device_id, product_id, bool(payload.get("state")))
                     elif sub == "temperature":
                         value = int(payload.get("value", 38))
+                        if not (10 <= value <= 40):
+                            _LOGGER.warning("Temperature %d out of range (10-40), ignoring", value)
+                            continue
                         await api.set_temperature(device_id, product_id, value)
                     elif sub == "bubbles":
                         level = int(payload.get("level", 0))
+                        if level not in (0, 40, 100):
+                            _LOGGER.warning("Bubbles level %d invalid (0/40/100), ignoring", level)
+                            continue
                         await api.set_bubbles(device_id, product_id, level)
                     else:
                         _LOGGER.warning("Unknown command topic: %s", sub)
