@@ -14,7 +14,7 @@ CREDENTIALS_PATH = Path(os.getenv("CREDENTIALS_PATH", "/app/data/credentials.jso
 
 # ── MQTT ──────────────────────────────────────────────────────────────────────
 
-MQTT_HOST: str = os.environ["MQTT_HOST"]
+MQTT_HOST: str = os.getenv("MQTT_HOST", "")
 MQTT_PORT: int = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER: str | None = os.getenv("MQTT_USER")
 MQTT_PASSWORD: str | None = os.getenv("MQTT_PASSWORD")

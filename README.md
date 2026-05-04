@@ -64,18 +64,31 @@ BESTWAY_QR_CODE=           # Only required for --onboard
 
 ### 2. Onboarding (one-time)
 
-On first run, the SmartHub QR code must be scanned and a visitor account created:
+On first run, the SmartHub QR code must be scanned and a visitor account created.  
+Make sure the data volume is mounted so credentials persist outside the container:
 
 ```bash
-docker compose run --rm bridge python main.py --onboard
+docker compose run --rm \
+  -v /path/to/your/data:/app/data \
+  -e BESTWAY_QR_CODE=RW_Share_xxxxxxxxxxxxxxxx \
+  bridge python main.py --onboard
 ```
 
 Credentials are stored in `data/credentials.json` and loaded automatically on subsequent starts.
 
 ### 3. Start the bridge
 
+Use the same volume mount for persistent credentials:
+
 ```bash
 docker compose up -d
+```
+
+If you use a custom data path, update `docker-compose.yml` accordingly:
+
+```yaml
+volumes:
+  - /path/to/your/data:/app/data
 ```
 
 ---

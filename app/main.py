@@ -75,6 +75,10 @@ async def onboard() -> None:
 # ── Normal bridge operation ───────────────────────────────────────────────────
 
 async def run() -> None:
+    if not config.MQTT_HOST:
+        _LOGGER.error("MQTT_HOST is not set in environment / .env")
+        sys.exit(1)
+
     creds = config.load_credentials()
     if creds is None:
         _LOGGER.error(
