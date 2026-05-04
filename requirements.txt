@@ -1,0 +1,4 @@
+aiohttp>=3.9
+websockets>=12.0
+paho-mqtt>=2.0
+pycryptodome>=3.20.0
