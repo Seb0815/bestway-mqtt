@@ -52,7 +52,6 @@ class MqttClient:
 
         self._client = mqtt.Client(
             client_id="bestway-bridge",
-            clean_session=True,
             protocol=mqtt.MQTTv5,
         )
 
