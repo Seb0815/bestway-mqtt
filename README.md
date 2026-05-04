@@ -106,7 +106,7 @@ volumes:
   "heater": 1,
   "filter": false,
   "bubbles": 0,
-  "temp_now": 36.5,
+  "temp_now": 36,
   "temp_set": 38,
   "temp_unit": "C",
   "locked": false,

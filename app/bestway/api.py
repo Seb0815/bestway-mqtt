@@ -38,7 +38,7 @@ class SpaState:
     heater: int       # 0=off 1=on 3=heating 4=target_reached
     filter: bool
     bubbles: int      # 0/40/100
-    temp_now: float
+    temp_now: int
     temp_set: int
     temp_unit: int    # 1=celsius 2=fahrenheit
     locked: bool
@@ -241,7 +241,7 @@ def _parse_state(s: dict[str, Any]) -> SpaState:
         heater=int(s.get("heater_state", 0)),
         filter=bool(s.get("filter_state", 0)),
         bubbles=int(s.get("wave_state", 0)),
-        temp_now=float(s.get("water_temperature", 0)),
+        temp_now=int(s.get("water_temperature", 0)),
         temp_set=int(s.get("temperature_setting", 0)),
         temp_unit=int(s.get("temperature_unit", 1)),
         locked=bool(s.get("locked", 0)),
