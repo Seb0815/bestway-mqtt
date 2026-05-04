@@ -97,28 +97,37 @@ class MqttClient:
     def _on_connect(self, client: mqtt.Client, userdata: Any, flags: Any, rc: Any, props: Any = None) -> None:
         if rc == 0:
             _LOGGER.info("MQTT connected")
-            # Subscribe to all command sub-topics
-            client.subscribe(f"{self._topic_cmd}/#", qos=1)
-            _LOGGER.info("Subscribed to %s/#", self._topic_cmd)
+            # Subscribe to base cmd topic and all sub-topics
+            client.subscribe([(self._topic_cmd, 1), (f"{self._topic_cmd}/#", 1)])
+            _LOGGER.info("Subscribed to %s and %s/#", self._topic_cmd, self._topic_cmd)
         else:
             _LOGGER.error("MQTT connect failed: rc=%s", rc)
 
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
-        # Derive sub-topic: everything after "spa/cmd/"
-        prefix = f"{self._topic_cmd}/"
-        if not msg.topic.startswith(prefix):
-            return
-        sub = msg.topic[len(prefix):]
-
         try:
             payload = json.loads(msg.payload.decode())
         except json.JSONDecodeError:
             _LOGGER.warning("Ignoring malformed command payload on %s", msg.topic)
             return
 
-        _LOGGER.info("Command received: %s = %s", sub, payload)
+        if msg.topic == self._topic_cmd:
+            # Combined format on base topic: {"topic": "power", "payload": {"state": true}}
+            sub = payload.get("topic")
+            if not sub or not isinstance(sub, str):
+                _LOGGER.warning("Missing or invalid 'topic' field in combined command")
+                return
+            inner = payload.get("payload", {})
+        else:
+            # Sub-topic format: spa/cmd/power  with payload {"state": true}
+            prefix = f"{self._topic_cmd}/"
+            if not msg.topic.startswith(prefix):
+                return
+            sub = msg.topic[len(prefix):]
+            inner = payload
+
+        _LOGGER.info("Command received: %s = %s", sub, inner)
         try:
-            self._on_command(sub, payload)
+            self._on_command(sub, inner)
         except Exception as exc:
             _LOGGER.error("Command handler error: %s", exc)
 

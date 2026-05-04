@@ -128,6 +128,13 @@ Sub-topics and payloads:
 | `spa/cmd/temperature` | `{"value": 38}` | Set target temperature (10–40 °C) |
 | `spa/cmd/bubbles` | `{"level": 40}` | Massage jets (0 / 40 / 100) |
 
+**Combined format:** Instead of sub-topics, you can publish directly to `spa/cmd` with a combined payload:
+
+```json
+{"topic": "power", "payload": {"state": true}}
+{"topic": "temperature", "payload": {"value": 38}}
+```
+
 ---
 
 ## Local Development (without Docker)
