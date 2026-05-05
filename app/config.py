@@ -20,6 +20,7 @@ MQTT_USER: str | None = os.getenv("MQTT_USER")
 MQTT_PASSWORD: str | None = os.getenv("MQTT_PASSWORD")
 MQTT_TOPIC_STATE: str = os.getenv("MQTT_TOPIC_STATE", "spa/state")
 MQTT_TOPIC_CMD: str = os.getenv("MQTT_TOPIC_CMD", "spa/cmd")
+SPA_OFFLINE_TIMEOUT: int = int(os.getenv("SPA_OFFLINE_TIMEOUT", "300"))  # seconds
 
 # ── Bestway API ───────────────────────────────────────────────────────────────
 

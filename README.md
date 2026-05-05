@@ -57,6 +57,9 @@ MQTT_PASSWORD=
 MQTT_TOPIC_STATE=spa/state
 MQTT_TOPIC_CMD=spa/cmd
 
+# Bridge
+SPA_OFFLINE_TIMEOUT=300    # Seconds without update before device is marked offline (default 300)
+
 # Bestway API
 BESTWAY_REGION=EU          # EU | US | CN
 BESTWAY_QR_CODE=           # Only required for --onboard
@@ -103,7 +106,7 @@ volumes:
 ```json
 {
   "power": true,
-  "heater": 1,
+  "heater": 3,
   "filter": false,
   "bubbles": 0,
   "temp_now": 36,
@@ -114,6 +117,19 @@ volumes:
   "error": 0
 }
 ```
+
+| Field | Type | Values |
+|---|---|---|
+| `power` | bool | `true` / `false` |
+| `heater` | int | `0` = off, `1` = on (standby), `3` = actively heating, `4` = target reached |
+| `filter` | bool | `true` / `false` |
+| `bubbles` | int | `0` = off, `40` = medium, `100` = high |
+| `temp_now` | int | Current water temperature |
+| `temp_set` | int | Target temperature |
+| `temp_unit` | string | `"C"` or `"F"` |
+| `locked` | bool | Child lock active |
+| `is_online` | bool | Device reachable — set to `false` if no update received within `SPA_OFFLINE_TIMEOUT` |
+| `error` | int | Error code (`0` = no error) |
 
 ### Commands (subscribed by the bridge)
 

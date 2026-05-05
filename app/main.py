@@ -16,6 +16,7 @@ import asyncio
 import logging
 import signal
 import sys
+import time
 from typing import Any
 
 import aiohttp
@@ -124,10 +125,16 @@ async def run() -> None:
 
         # ── WebSocket state callback ───────────────────────────────────────
 
+        last_update_time: float = time.monotonic()
+        last_state_dict: dict[str, Any] | None = None
+
         def on_spa_state(shadow: dict[str, Any]) -> None:
+            nonlocal last_update_time, last_state_dict
             state = parse_shadow_update(shadow)
             if state:
-                mqtt_client.publish_state(state.to_dict())
+                last_update_time = time.monotonic()
+                last_state_dict = state.to_dict()
+                mqtt_client.publish_state(last_state_dict)
 
         async def token_refresh() -> str:
             new_token = await authenticate(session, creds.visitor_id, config.BESTWAY_API_BASE)
@@ -181,6 +188,26 @@ async def run() -> None:
                 except Exception as exc:
                     _LOGGER.error("Command execution failed (%s): %s", sub, exc)
 
+        # ── Online watchdog ─────────────────────────────────────────────────
+
+        async def online_watchdog() -> None:
+            """Publish is_online=false when no update received within timeout."""
+            was_offline = False
+            while not stop_event.is_set():
+                await asyncio.sleep(30)
+                elapsed = time.monotonic() - last_update_time
+                if elapsed >= config.SPA_OFFLINE_TIMEOUT:
+                    if not was_offline and last_state_dict is not None:
+                        offline = {**last_state_dict, "is_online": False}
+                        mqtt_client.publish_state(offline)
+                        _LOGGER.warning(
+                            "No update for %ds — marking device offline",
+                            int(elapsed),
+                        )
+                        was_offline = True
+                else:
+                    was_offline = False
+
         # ── Start & wait ───────────────────────────────────────────────────
 
         _LOGGER.info(
@@ -192,6 +219,7 @@ async def run() -> None:
             await asyncio.gather(
                 ws.start(),
                 dispatch_commands(),
+                online_watchdog(),
                 stop_event.wait(),
             )
         finally:
