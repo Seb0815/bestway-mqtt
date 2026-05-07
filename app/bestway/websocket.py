@@ -24,8 +24,8 @@ _ENDPOINTS: dict[str, str] = {
     "cn-north-1":   "wss://fu9gsv4dxh.execute-api.cn-north-1.amazonaws.com.cn/prod",
 }
 
-# Exponential backoff delays in seconds (caps at 60 s)
-_BACKOFF = [3, 6, 12, 24, 48, 60]
+# Exponential backoff delays in seconds (extends to 30 min for long outages)
+_BACKOFF = [3, 6, 12, 24, 48, 60, 120, 300, 600, 1800]
 
 StateCallback = Callable[[dict[str, Any]], Awaitable[None] | None]
 TokenRefreshCallback = Callable[[], Awaitable[str]]
@@ -96,14 +96,23 @@ class SpaWebSocket:
                 ssl=ssl_ctx,
                 ping_interval=None,  # we handle heartbeat manually
             )
-            self._running = True
             self._reconnect_count = 0
             _LOGGER.info("WebSocket connected for device %s", short_id)
 
-            await asyncio.gather(
-                self._listen(),
-                self._heartbeat(),
+            listen_task = asyncio.create_task(self._listen())
+            heartbeat_task = asyncio.create_task(self._heartbeat())
+
+            # Wait until either task ends, then cancel the other
+            done, pending = await asyncio.wait(
+                [listen_task, heartbeat_task],
+                return_when=asyncio.FIRST_COMPLETED,
             )
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
         except Exception as exc:
             err = str(exc)
@@ -120,7 +129,8 @@ class SpaWebSocket:
                 except Exception as refresh_exc:
                     _LOGGER.error("Token refresh failed: %s", refresh_exc)
 
-            await self._schedule_reconnect()
+        # Always attempt reconnect after disconnection (unless stopped)
+        await self._schedule_reconnect()
 
     async def _listen(self) -> None:
         short_id = self._device_id[:12]
@@ -133,12 +143,10 @@ class SpaWebSocket:
                     _LOGGER.warning("Malformed JSON from WebSocket")
         except websockets.exceptions.ConnectionClosed:
             _LOGGER.warning("WebSocket closed for device %s", short_id)
-            if self._running:
-                await self._schedule_reconnect()
         except Exception as exc:
             _LOGGER.error("Listen loop error for device %s: %s", short_id, exc)
-            if self._running:
-                await self._schedule_reconnect()
+        else:
+            _LOGGER.warning("WebSocket disconnected cleanly for device %s", short_id)
 
     async def _heartbeat(self) -> None:
         while self._running and self._ws:
