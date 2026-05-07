@@ -87,7 +87,7 @@ class MqttClient:
         """Publish an offline marker so subscribers know the bridge lost connection."""
         self._client.publish(
             self._topic_state,
-            json.dumps({"online": False}),
+            json.dumps({"is_online": False}),
             qos=1,
             retain=True,
         )

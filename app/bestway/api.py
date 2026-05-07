@@ -234,6 +234,10 @@ class BestwayApi:
 
 # ── State parsing ─────────────────────────────────────────────────────────────
 
+# Last known raw reported state, used to fill in missing fields from partial updates
+_last_reported: dict[str, Any] = {}
+
+
 def _parse_state(s: dict[str, Any]) -> SpaState:
     """Normalise raw AWS IoT shadow fields into a SpaState."""
     return SpaState(
@@ -254,16 +258,17 @@ def _parse_state(s: dict[str, Any]) -> SpaState:
 def parse_shadow_update(shadow: dict[str, Any]) -> SpaState | None:
     """Parse an incoming WebSocket shadow delta message into a SpaState.
 
-    Returns None if the message does not contain state data.
-    Receiving a shadow update implies the device is online, so is_online
-    is forced to True regardless of the cloud-side flag.
+    Only processes 'reported' state (actual device state). 'desired'-only
+    updates are command echoes with partial data and must be ignored.
+    Partial reported updates are merged with the last known full state.
+    Returns None if no reported state is present.
     """
-    state = (
-        shadow.get("state", {}).get("reported")
-        or shadow.get("state", {}).get("desired")
-    )
-    if not state:
+    global _last_reported
+    reported = shadow.get("state", {}).get("reported")
+    if not reported:
         return None
-    spa = _parse_state(state)
+    # Merge partial update into last known state
+    _last_reported = {**_last_reported, **reported}
+    spa = _parse_state(_last_reported)
     spa.is_online = True
     return spa
