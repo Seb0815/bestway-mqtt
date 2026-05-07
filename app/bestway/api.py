@@ -255,6 +255,8 @@ def parse_shadow_update(shadow: dict[str, Any]) -> SpaState | None:
     """Parse an incoming WebSocket shadow delta message into a SpaState.
 
     Returns None if the message does not contain state data.
+    Receiving a shadow update implies the device is online, so is_online
+    is forced to True regardless of the cloud-side flag.
     """
     state = (
         shadow.get("state", {}).get("reported")
@@ -262,4 +264,6 @@ def parse_shadow_update(shadow: dict[str, Any]) -> SpaState | None:
     )
     if not state:
         return None
-    return _parse_state(state)
+    spa = _parse_state(state)
+    spa.is_online = True
+    return spa
