@@ -152,6 +152,17 @@ async def run() -> None:
             on_token_refresh=token_refresh,
         )
 
+        # ── Fetch & publish initial state via REST API ─────────────────────
+
+        try:
+            initial_state = await api.fetch_state(creds.device_id, creds.product_id)
+            last_update_time = time.monotonic()
+            last_state_dict = initial_state.to_dict()
+            mqtt_client.publish_state(last_state_dict)
+            _LOGGER.info("Initial state published (is_online=%s)", initial_state.is_online)
+        except Exception as exc:
+            _LOGGER.warning("Could not fetch initial state: %s", exc)
+
         # ── Command dispatch loop ──────────────────────────────────────────
 
         async def dispatch_commands() -> None:
