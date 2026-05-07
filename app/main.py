@@ -202,22 +202,41 @@ async def run() -> None:
         # ── Online watchdog ─────────────────────────────────────────────────
 
         async def online_watchdog() -> None:
-            """Publish is_online=false when no update received within timeout."""
+            """Periodically poll REST API to keep state fresh and detect offline."""
             was_offline = False
+            poll_interval = config.SPA_OFFLINE_TIMEOUT // 2 or 60
             while not stop_event.is_set():
-                await asyncio.sleep(30)
-                elapsed = time.monotonic() - last_update_time
-                if elapsed >= config.SPA_OFFLINE_TIMEOUT:
-                    if not was_offline and last_state_dict is not None:
-                        offline = {**last_state_dict, "is_online": False}
-                        mqtt_client.publish_state(offline)
-                        _LOGGER.warning(
-                            "No update for %ds — marking device offline",
-                            int(elapsed),
-                        )
+                await asyncio.sleep(poll_interval)
+
+                # Poll current state via REST API
+                try:
+                    nonlocal last_update_time, last_state_dict
+                    state = await api.fetch_state(creds.device_id, creds.product_id)
+                    state_dict = state.to_dict()
+                    last_state_dict = state_dict
+                    mqtt_client.publish_state(state_dict)
+
+                    if state.is_online:
+                        last_update_time = time.monotonic()
+                        if was_offline:
+                            _LOGGER.info("Device back online")
+                        was_offline = False
+                    else:
+                        if not was_offline:
+                            _LOGGER.warning("Device reported offline by cloud")
                         was_offline = True
-                else:
-                    was_offline = False
+                except Exception as exc:
+                    _LOGGER.warning("State poll failed: %s", exc)
+                    elapsed = time.monotonic() - last_update_time
+                    if elapsed >= config.SPA_OFFLINE_TIMEOUT:
+                        if not was_offline and last_state_dict is not None:
+                            offline = {**last_state_dict, "is_online": False}
+                            mqtt_client.publish_state(offline)
+                            _LOGGER.warning(
+                                "No update for %ds — marking device offline",
+                                int(elapsed),
+                            )
+                            was_offline = True
 
         # ── Start & wait ───────────────────────────────────────────────────
 
